@@ -344,6 +344,33 @@ class JsonRpc(object):
             http_request.pending[msg.data['id']].set_result(
                 msg.data['result'])
 
+        # handle notifications
+        elif msg.type == JsonRpcMsgTyp.NOTIFICATION:
+            self.logger.debug('msg gets handled as notification')
+
+            # check if method is available
+            if msg.data['method'] not in http_request.methods:
+                self.logger.warning('method %s is unknown or restricted',
+                                  msg.data['method'])
+                return
+
+            # call method
+            try:
+                result = await http_request.methods[msg.data['method']](
+                    http_request=http_request,
+                    rpc=self,
+                    msg=msg,
+                )
+
+            except (RpcGenericServerDefinedError,
+                    RpcInvalidRequestError,
+                    RpcInvalidParamsError) as error:
+                self.logger.error(f'Error occured specific to this library: {error}')
+
+            except Exception as error:
+                self.logger.error(f'Exception occured not specific to this library: {error}')
+                logging.error(error, exc_info=True)
+
         else:
             self.logger.debug('unsupported msg type (%s)', msg.type)
 
